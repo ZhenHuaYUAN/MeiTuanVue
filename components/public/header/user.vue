@@ -15,11 +15,18 @@
 </template>
 
 <script>
+import axios from 'axios'
 export default {
   data() {
     return {
       user: ""
     };
+  },
+  async mounted() {
+    const{status,data:{user}} = await this.$axios.get("http://127.0.0.1:3000/users/getUser")
+    if(status === 200) {
+      this.user = user
+    }
   }
 };
 </script>

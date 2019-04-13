@@ -45,10 +45,7 @@
           <div class="error">{{error}}</div>
         </el-form-item>
         <el-form-item>
-          <a
-            class="f1"
-            href="http://www.meituan.com/about/terms"
-            target="_blank">《美团网用户协议》</a>
+          <a class="f1" href="http://www.meituan.com/about/terms" target="_blank">《美团网用户协议》</a>
         </el-form-item>
       </el-form>
     </section>
@@ -56,11 +53,15 @@
 </template>
 
 <script>
+// 加密密码
+import CryptoJS from "crypto-js";
+import axios from "axios";
 export default {
   // 选择对应模板
   layout: "blank",
   data() {
     return {
+      timerid: "",
       statusMsg: "",
       error: "",
       ruleForm: {
@@ -107,8 +108,76 @@ export default {
     };
   },
   methods: {
-    sendMsg() {},
-    register() {}
+    sendMsg() {
+      const self = this;
+      let namePass;
+      let emailPass;
+      // 记录时间是否到了可以重新发送的时候
+      if (self.timerid) {
+        return false;
+      }
+      this.$refs["ruleForm"].validateField("name", valid => {
+        namePass = valid;
+      });
+      self.statusMsg = "";
+      if (namePass) {
+        return false;
+      }
+      this.$refs["ruleForm"].validateField("email", valid => {
+        emailPass = valid;
+      });
+      if (!namePass && !emailPass) {
+        self.$axios
+          .post("http://127.0.0.1:3000/users/verify", {
+            username: encodeURIComponent(self.ruleForm.name),
+            email: self.ruleForm.email
+          })
+          .then(({ status, data }) => {
+            if (status === 200 && data && data.code === 0) {
+              let count = 60;
+              self.statusMsg = `验证码已发送，剩余${count--}秒`;
+              self.timerid = setInterval(function() {
+                self.statusMsg = `验证码已发送，剩余${count--}秒`;
+                if (count === 0) {
+                  clearInterval(self.timerid);
+                  self.statusMsg = `可重新发送验证码`;
+                }
+              }, 1000);
+            } else {
+              self.statusMsg = data.msg;
+            }
+          });
+      }
+    },
+    register() {
+      let self = this;
+      // 当所有验证都通过
+      this.$refs["ruleForm"].validate((valid) => {
+        if (valid) {
+          self.$axios
+            .post("http://127.0.0.1:3000/users/signup", {
+              username: window.encodeURIComponent(self.ruleForm.name),
+              password: CryptoJS.MD5(self.ruleForm.pwd).toString(), //crypto-js加密用
+              email: self.ruleForm.email,
+              code: self.ruleForm.code
+            })
+            .then(({ status, data }) => {
+              if (status === 200) {
+                if (data && data.code === 0) {
+                  location.href = "/login";
+                } else {
+                  self.error = data.msg;
+                }
+              } else {
+                self.error = `服务器出错，错误码:${status}`;
+              }
+              setTimeout(function() {
+                self.error = "";
+              }, 1500);
+            });
+        }
+      });
+    }
   },
   rules: {}
 };
